@@ -237,12 +237,68 @@ class TCS34725(object):
 
     def clear_interrupt(self):
         """Clear interrupt."""
-        self._device.write8(0x66 & 0xff)
+        self._device.writeRaw8(TCS34725_COMMAND_BIT | 0x66)
 
     def set_interrupt_limits(self, low, high):
-        """Set the interrupt limits to provied unsigned 16-bit threshold values.
+        """Set the interrupt limits to provided unsigned 16-bit threshold values.
+        Note that if the persistence setting is TCS34725_PERS_NONE these limits
+        will be ignored and you'll get an interrupt every cycle.
         """
-        self._device.write8(0x04, low & 0xFF)
-        self._device.write8(0x05, low >> 8)
-        self._device.write8(0x06, high & 0xFF)
-        self._device.write8(0x07, high >> 8)
+        self._write8(0x04, low & 0xFF)
+        self._write8(0x05, low >> 8)
+        self._write8(0x06, high & 0xFF)
+        self._write8(0x07, high >> 8)
+
+    def set_wait(self, enabled):
+        """Enable or disable the wait state, which causes the chip to pause 
+        between color readings in order to save power.
+        """
+        enable_reg = self._readU8(TCS34725_ENABLE)
+        if enabled:
+            enable_reg |= TCS34725_ENABLE_WEN
+        else:
+            enable_reg &= ~TCS34725_ENABLE_WEN
+        self._write8(TCS34725_ENABLE, enable_reg)
+
+    def set_wait_time(self, increments):
+        """If the wait state is enabled, this configures the amount of time to
+        wait between color readings as a 2's complement number in increments
+        of 2.4ms:
+         - TCS34725_WTIME_2_4MS  = 0xFF = 1 cycle    = 2.4ms
+         - TCS34725_WTIME_204MS  = 0xAB = 85 cycles  = 204ms
+         - TCS34725_WTIME_614MS  = 0x00 = 256 cycles = 615ms
+        """ 
+        self._write8(TCS34725_WTIME, increments)
+
+    def set_wait_long(self, enabled):
+        """Enable or disable WLONG, which causes wait state times to be 12x 
+        longer.
+        """
+        config_reg = self._readU8(TCS34725_CONFIG)
+        if enabled:
+            config_reg |= TCS34725_CONFIG_WLONG
+        else:
+            config_reg &= ~TCS34725_CONFIG_WLONG
+        self._write8(TCS34725_CONFIG, config_reg)
+
+    def set_persistence(self, cycles):
+        """Sets the number of color readings that must fall outside of the 
+        interrupt limits in order to generate an interrupt.
+         - TCS34725_PERS_NONE      = 0b0000 - Every RGBC cycle generates an interrupt
+         - TCS34725_PERS_1_CYCLE   = 0b0001 - 1 clean channel value outside threshold range generates an interrupt
+         - TCS34725_PERS_2_CYCLE   = 0b0010 - 2 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_3_CYCLE   = 0b0011 - 3 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_5_CYCLE   = 0b0100 - 5 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_10_CYCLE  = 0b0101 - 10 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_15_CYCLE  = 0b0110 - 15 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_20_CYCLE  = 0b0111 - 20 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_25_CYCLE  = 0b1000 - 25 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_30_CYCLE  = 0b1001 - 30 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_35_CYCLE  = 0b1010 - 35 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_40_CYCLE  = 0b1011 - 40 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_45_CYCLE  = 0b1100 - 45 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_50_CYCLE  = 0b1101 - 50 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_55_CYCLE  = 0b1110 - 55 clean channel values outside threshold range generates an interrupt
+         - TCS34725_PERS_60_CYCLE  = 0b1111 - 60 clean channel values outside threshold range generates an interrupt
+        """
+        self._write8(TCS34725_PERS, cycles)
